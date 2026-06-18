@@ -61,6 +61,27 @@ env:
   - name: KEYSTONE_DB_PASS
   - name: KEYSTONE_DB_DRIVER
     default: "ODBC"  # or appropriate driver
+
+auth:
+  preferred_flows:
+    - name: ActiveDirectoryInteractive
+      description: "Azure AD (Microsoft Entra) interactive authentication with MFA for human users. Use drivers that support ActiveDirectoryInteractive (ODBC/ODBC Driver 18+ / pyodbc)."
+    - name: ManagedIdentity
+      description: "Use Managed Identity when running in Azure (recommended for automation and CI)."
+    - name: AzureCLI-token
+      description: "Obtain an access token via 'az login' (interactive) or service principal, then pass the token to the DB driver (resource: https://database.windows.net)."
+  note: "DO NOT store plaintext DB credentials in source control. Use a secret manager or Azure Key Vault. For interactive testing, prefer ActiveDirectoryInteractive (MFA). For automation, use Managed Identity or an Azure AD service principal with appropriately scoped credentials."
+  examples: |
+    - Python (pyodbc) interactive/MFA connection string example:
+        conn_str = (
+          "Driver={ODBC Driver 18 for SQL Server};"
+          "Server=tcp:arches.database.windows.net,1433;"
+          "Database=Keystone;"
+          "Authentication=ActiveDirectoryInteractive;"
+        )
+    - Token approach (non-interactive):
+        az account get-access-token --resource https://database.windows.net --query accessToken -o tsv
+        # Pass the returned token to your DB driver according to the driver's access-token API.
 query_template: |
   -- Base query (normalization and row limit)
   SELECT DISTINCT TOP ({row_limit})
