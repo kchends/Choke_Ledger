@@ -1,33 +1,46 @@
 ---
-name: keystone-reference-map
+name: keystone-part-reference
 version: 0.1.0
-description: "Reference map that links MPN ↔ MSPN ↔ Subcategory ↔ Supplier ↔ Commodity using Keystone vwplanning.sapibpreferencetdst2aproduct."
+description: >
+  Resolve relationships between MPN, MSPN, Supplier,
+  Commodity, and Subcategory using Keystone reference data.
+  Supports lookups starting from any known attribute and
+  returns matching related attributes.
 triggers:
-  - intent: "User wants to map or look up MPN, MSPN, subcategory, supplier, or commodity relationships."
-  - intent: "User provides part numbers and asks for reference metadata."
-  - intent: "User asks to connect product identifiers across Keystone reference fields."
+  - intent: "User wants to map or translate between MPN, MSPN, Supplier, Commodity, and Subcategory."
+  - intent: "User wants to identify related part metadata."
+  - intent: "User wants to find relationships among Keystone product reference attributes."
   - examples:
-      - "connect the MPN to the subcategory"
-      - "show me the subcategory for these MPNs"
-      - "what's the MSPN for this MPN"
-      - "mpn reference"
-      - "mpn to subcategory"
+      - "What subcategory is this MPN?"
+      - "Which supplier owns this MSPN?"
+      - "Show all MPNs in COMPONENT_DRAM."
+      - "What commodity does this supplier provide?"
+      - "Map supplier to subcategory."
 inputs:
   - name: mpns
     type: list[string]
     required: false
-    description: "List of MPNs to look up. If omitted, the skill can return a sample or the cached reference table."
+    description: "List of MPNs to look up."
   - name: mspns
     type: list[string]
     required: false
-    description: "Optional list of MSPNs to filter."
-  - name: subcategory
-    type: string
+    description: "List of MSPNs to look up."
+  - name: suppliers
+    type: list[string]
     required: false
-    description: "Optional subcategory filter."
-  - name: supplier
-    type: string
+    description: "List of suppliers to filter by."
+  - name: commodities
+    type: list[string]
     required: false
+    description: "List of commodities to filter by."
+  - name: subcategories
+    type: list[string]
+    required: false
+    description: "List of subcategories to filter by."
+  - name: row_limit
+    type: integer
+    required: false
+    description: "Maximum number of rows to return (honors limits.default_row_limit and limits.max_row_limit)."
 outputs:
   - name: rows
     type: table
