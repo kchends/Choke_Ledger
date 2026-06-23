@@ -1,0 +1,33 @@
+/* Softer theme and MVP highlighting — updated v0.2.3 */
+body{font-family:system-ui,Segoe UI,Roboto,Arial;margin:0;background:linear-gradient(180deg,#e9f0ff,#f7fbff);color:#1f2937}
+.app{max-width:900px;margin:36px auto;background:linear-gradient(180deg,#fbfdff,#f7fbff);padding:22px;border-radius:14px;box-shadow:0 18px 40px rgba(11,63,120,0.06)}
+header h1{margin:0 0 12px;font-size:30px;color:#0b3d91;text-transform:uppercase;letter-spacing:0.6px}
+.addRow{display:flex;gap:8px;margin-bottom:14px;border:2px solid #93c5fd;padding:14px;border-radius:12px;background:linear-gradient(180deg,#ffffff,#f0f9ff);box-shadow:0 8px 24px rgba(14,165,233,0.06)}
+.addRow input{background:#fff;border:1px solid #60a5fa;padding:12px;border-radius:10px;box-shadow:inset 0 1px 6px rgba(16,24,40,0.04);font-size:15px}
+.addRow input{flex:1;padding:12px;border:1px solid #e6eefc;border-radius:10px;background:#ffffff}
+.addRow input[type=number]{width:100px}
+.addRow button{padding:10px 16px;border-radius:10px;border:none;background:#0b63d6;color:#fff;cursor:pointer;box-shadow:0 6px 18px rgba(11,99,214,0.12)}
+.list{list-style:none;padding:0;margin:0}
+.item{position:relative;display:flex;align-items:center;justify-content:space-between;padding:18px;border:1px solid #dbeafe;background:#ffffff;border-radius:12px;margin-bottom:14px;box-shadow:0 10px 30px rgba(2,6,23,0.06);transition:box-shadow .18s,transform .12s}
+.item:hover{transform:translateY(-2px);box-shadow:0 18px 40px rgba(2,6,23,0.08)}
+.item.mvp{position:relative;background:linear-gradient(90deg,rgba(255,243,205,0.25),rgba(255,255,255,0));padding-left:18px;border-radius:8px}
+.item.mvp::before{content:'';position:absolute;left:10px;top:14px;bottom:14px;width:8px;background:linear-gradient(180deg,#ffd54d,#ffb703);border-radius:4px;box-shadow:0 6px 12px rgba(255,183,28,0.12)}
+.item.donor::after{content:'';position:absolute;right:12px;top:12px;width:10px;height:32px;background:linear-gradient(180deg,#7c3aed,#6d28d9);border-radius:6px;box-shadow:0 8px 20px rgba(124,58,237,0.18)}
+.item.mvp{position:relative;background:linear-gradient(90deg,rgba(255,243,205,0.25),rgba(255,255,255,0));padding-left:18px;border-radius:8px} .item.mvp::before{content:'';position:absolute;left:10px;top:14px;bottom:14px;width:8px;background:linear-gradient(180deg,#ffd54d,#ffb703);border-radius:4px;box-shadow:0 6px 12px rgba(255,183,28,0.12)}
+.name{display:flex;align-items:center;gap:12px;font-weight:800;color:#0b2f6b;font-size:16px}
+.sub{color:#374151;font-size:13px;margin-top:6px}
+.controls button{margin-left:8px;padding:8px 10px;border-radius:8px;border:1px solid #e6eefc;background:#fff;cursor:pointer}
+.controls .rm{color:#b00;border-color:#f5d0d0}
+.footer{display:flex;gap:12px;margin-top:12px}
+.exportBtn{background:#e6eefc;border:none;padding:8px 12px;border-radius:8px;color:#0b3d91}
+.status{margin-top:12px;color:#6b7280;font-size:13px}
+.mvp-badge{display:inline-block;margin-left:10px;background:linear-gradient(90deg,#ffd54d,#ffb703);color:#5a2f00;padding:6px 10px;border-radius:999px;font-weight:800;font-size:13px;box-shadow:0 6px 18px rgba(255,183,28,0.18);border:1px solid rgba(255,255,255,0.7);position:relative;z-index:2;transform:translateY(-2px)}
+.donor-badge{display:inline-block;margin-left:8px;background:linear-gradient(90deg,#7c3aed,#6d28d9);color:#fff;padding:6px 12px;border-radius:999px;font-weight:900;font-size:13px;box-shadow:0 10px 30px rgba(109,40,217,0.24);border:1px solid rgba(255,255,255,0.2);position:relative;z-index:3;transform:translateY(-2px)}
+.events{background:linear-gradient(180deg,#ffffff,#fbfdff);border:1px solid #eef4fb;padding:10px;border-radius:10px;margin-top:8px;box-shadow:0 6px 18px rgba(11,63,120,0.04)}
+/* responsive */
+@media (max-width:720px){ .app{margin:12px;padding:12px} .addRow{flex-direction:column} .addRow input[type=number]{width:100%} .controls button{padding:6px} 
+  /* stack charts and make canvases responsive */
+  #topCenter > div:nth-child(3){ display:flex;flex-direction:column;gap:12px;align-items:center }
+  #topCenter canvas{ width:92% !important; max-width:360px; height:160px !important }
+  .addRow{ width:92% !important }
+}
