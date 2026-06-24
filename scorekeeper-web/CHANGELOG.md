@@ -2,6 +2,80 @@
 
 All notable changes to this project are documented here. Each version bump increases the VERSION file by 0.0.1.
 
+## v0.0.1 - 2026-06-23
+- Baseline snapshot: current working state of the web app pushed as initial baseline. Includes UI, events, skill-rate editor (client PIN 0715), offline test helpers, and chart fixes.
+
+---
+
+## v1.2.27 - 2026-06-23
+- Fix: restore non-edit DOM after exiting edit mode (rehydrate name/sub elements) so Save/Cancel correctly return to default view on mobile.
+- Fix: force-render bypass added to guarantee UI refresh after Save/Cancel on mobile devices.
+- Fix: minor responsiveness improvements for expand/collapse (optimistic placeholder while fetching events).
+
+## v1.2.26 - 2026-06-23
+- Fix: improved mobile edit UX — Save/Cancel now immediately exit edit mode (optimistic UI) and reliably handle touch events.
+- Fix: expand/collapse now responds instantly on tap by showing a loading placeholder and fetching events in background.
+- Fix: replaced nested async IIFEs with Promise-based handlers to avoid syntax errors on some browsers.
+
+## v1.2.25 - 2026-06-23
+- Fix: mobile touch handlers improved — Save/Cancel now reliably work on mobile (touchend/pointerup delegation + dedupe) and edit mode exits cleanly.
+- QoL: delegated click handler now handles touch events and prevents duplicate touch+click firing.
+
+## v1.2.24 - 2026-06-23
+- Fix: re-enabled in-place player edit UI and ensured Edit button triggers a forced re-render so inline editor appears reliably.
+- Fix: clear render snapshot when entering/exiting edit mode to avoid no-op render short-circuit.
+
+## v1.2.23 - 2026-06-23
+- Fix: eliminated most UI flicker by implementing granular per-player DOM patching (only changed nodes updated), avoiding full list redraws.
+- Fix: ensure skill rates panel measures/positions after layout (requestAnimationFrame) to prevent first-open misplacement.
+
+## v1.2.22 - 2026-06-23
+- Fix: skill rates panel first-open placement measured after display to ensure correct desktop positioning; fixes first-click misplacement.
+- Fix: skip server merge while document.hidden to avoid background layout churn; increased poll interval to 10s.
+
+## v1.2.21 - 2026-06-23
+- Fix: greatly reduced UI flicker by skipping no-op re-renders and increasing server poll interval; render now diffs a compact snapshot before updating.
+- Fix: further mobile scroll stability improvements.
+
+## v1.2.20 - 2026-06-23
+- Fix: skill rates panel now preserves mobile layout and desktop positioning; clicking the button toggles open/close without hiding the button.
+- Fix: ensure panel does not overlay the Skill rates button on desktop (button gets higher z-index while open).
+
+## v1.2.19 - 2026-06-23
+- Fix: desktop skill-rates toggle made bi-directional (click to open/close); reduced flicker by only re-rendering when server data changes.
+- Fix: prevent oversized audit snapshots from failing by truncating large change/snapshot payloads before writing.
+
+## v1.2.18 - 2026-06-23
+- Fix: reduced phone scroll-jump by toggling skill rates panel via CSS class (no layout reflow); uses opacity/transform instead of display.
+- Fix: improved Mark Paid reliability by retrying server paid-event creation (3 attempts) and added alignment fixes for donor controls.
+
+## v1.2.17 - 2026-06-23
+- UI: clearer player card highlights — removed gradient side bars; highlights now use solid translucent background colors (purple for Choke Champion, green for Biggest Contributor, gold when both).
+- UI: stronger badge contrast — donor badge now matches prominence of Choke Champion; badges remain top-right and non-blocking.
+- Fix: updated styles to avoid visual stripes and improve mobile/desktop parity.
+
+## v1.2.16 - 2026-06-23
+- UI: moved badges to the top-right corner of player cards and reduced badge size so they don't overlap or push text; badges are absolutely positioned above content.
+- Mobile: adjusted badge positions and sizes to ensure they don't obstruct controls; badges are stacked vertically at top-right.
+- Policy: assistant will auto-update local CHANGELOG.md and VERSION for every local change (no approval required).
+
+## v1.2.15 - 2026-06-23
+- Mobile: fixed skill rates panel overflow by rendering as a non-blocking overlay on small screens; it no longer pushes content off-screen.
+- Mobile: increased gap between chart panels to avoid title/legend overlap.
+- UI: badges now render above text (absolute positioning) so they don't crowd player text; reduced badge size on mobile.
+- Policy: local changelog and VERSION are updated automatically by the assistant for each local change (no approval required).
+
+## v1.2.14 - 2026-06-23
+- Mobile: improved responsive layout for phones — increased spacing between chart panels, reduced badge size, stacked player-card content and moved controls below player info for better readability.
+- Mobile: skill rates panel made non-blocking on small screens (renders as inline panel), preventing horizontal overflow; buttons reduced and badges wrapped.
+- UI: removed decorative side bars from highlighted cards so background color is the only highlight.
+
+## v1.2.13 - 2026-06-23
+- UI: stronger player card borders, card-like layout, hover lift, and clearer separation between player records.
+- UI: added "Biggest Contributor" badge (green) and "Choke Champion" badge (purple); when both are present the card highlights gold and displays both stripes.
+- UI: improved history panel styling (expanded, MM-DD under year headers) and event panel visuals for better readability.
+- UX: refined badge styles, donor/mvp parity, and improved Mark paid/Revert visibility.
+
 ## v1.2.12 - 2026-06-23
 - Feature: "Mark paid" records PAID events (visible across devices) and creates audit change entries; added reversible "Revert paid" requiring PIN.
 - History: combined miss+change events, grouped by year with MM-DD, shows last 5 entries with "Show more".
