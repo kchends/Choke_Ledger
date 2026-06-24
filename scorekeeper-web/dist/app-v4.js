@@ -1,6 +1,6 @@
 // REST-only Scorekeeper app bundle v4
 (function(){
-  const API_KEY = 'REDACTED_API_KEY';
+  const API_KEY = (window && window.__FIRESTORE_API_KEY) || '';
   const PROJECT = 'the-choke-ledger';
   const DB_ID = 'choke';
   const LOCAL_KEY = 'scorekeeper.players';

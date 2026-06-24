@@ -1,0 +1,39 @@
+[debug] [2026-06-19T23:30:10.068Z] ----------------------------------------------------------------------
+[debug] [2026-06-19T23:30:10.070Z] Command:       C:\nvm4w\nodejs\node.exe C:\Users\kevchen\AppData\Local\npm-cache\_npx\7750544ccf494d8b\node_modules\firebase-tools\lib\bin\firebase.js login --no-localhost --debug
+[debug] [2026-06-19T23:30:10.070Z] CLI Version:   15.22.0
+[debug] [2026-06-19T23:30:10.070Z] Platform:      win32
+[debug] [2026-06-19T23:30:10.070Z] Node Version:  v24.17.0
+[debug] [2026-06-19T23:30:10.070Z] Detected Agent: unknown
+[debug] [2026-06-19T23:30:10.071Z] Time:          Fri Jun 19 2026 16:30:10 GMT-0700 (Pacific Daylight Time)
+[debug] [2026-06-19T23:30:10.071Z] ----------------------------------------------------------------------
+[debug] 
+[info] i  The Firebase CLI’s MCP server feature can optionally make use of Gemini in Firebase. Learn more about Gemini in Firebase and how it uses your data: https://firebase.google.com/docs/gemini-in-firebase#how-gemini-in-firebase-uses-your-data 
+[info] 
+[info] i  Firebase optionally collects CLI and Emulator Suite usage and error reporting information to help improve our products. Data is collected in accordance with Google's privacy policy (https://policies.google.com/privacy) and is not used to identify you. 
+[debug] [2026-06-19T23:30:17.967Z] >>> [apiv2][query] POST https://auth.firebase.tools/attest [none]
+[debug] [2026-06-19T23:30:17.968Z] >>> [apiv2][body] POST https://auth.firebase.tools/attest {"session_id":"62ae2b0c-59e6-40df-a93b-395253df4ddb"}
+[debug] [2026-06-19T23:30:18.202Z] <<< [apiv2][status] POST https://auth.firebase.tools/attest 200
+[debug] [2026-06-19T23:30:18.203Z] <<< [apiv2][body] POST https://auth.firebase.tools/attest {"token":"ziDxnsjGsiu_PydLQR9AAP9c5tDehFbq8kbfyRaB66I"}
+[info] 
+[info] To sign in to the Firebase CLI:
+[info] 
+[info] 1. Take note of your session ID:
+[info] 
+[info]    62AE2
+[info] 
+[info] 2. Visit the URL below on any device and follow the instructions to get your code:
+[info] 
+[info]    https://auth.firebase.tools/login?code_challenge=ppUbkQtQrbnpW6Sn3gUCYMvgLiKeIItujrGatFkq1Xo&session=62ae2b0c-59e6-40df-a93b-395253df4ddb&attest=ziDxnsjGsiu_PydLQR9AAP9c5tDehFbq8kbfyRaB66I
+[info] 
+[info] 3. Paste or enter the authorization code below once you have it:
+[info] 
+[debug] [2026-06-19T23:30:37.621Z] >>> [apiv2][query] POST https://accounts.google.com/o/oauth2/token [none]
+[debug] [2026-06-19T23:30:37.622Z] >>> [apiv2][body] POST https://accounts.google.com/o/oauth2/token [omitted]
+[debug] [2026-06-19T23:30:37.786Z] Token Fetch Error: FirebaseError: FetchError: Invalid response body while trying to fetch https://accounts.google.com/o/oauth2/token: Premature close
+    at RetryOperation._fn (C:\Users\kevchen\AppData\Local\npm-cache\_npx\7750544ccf494d8b\node_modules\firebase-tools\lib\apiv2.js:317:88)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+[error] Authentication Error: Your credentials are no longer valid. Please run firebase login --reauth
+
+For CI servers and headless environments, generate a new token with firebase login:ci
+[error] 
+[error] Error: Unable to authenticate using the provided code. Please try again.

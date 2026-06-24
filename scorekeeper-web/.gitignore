@@ -1,0 +1,12 @@
+# local config with secrets
+config.js
+
+# Node modules
+node_modules/
+
+# build artifacts
+dist/
+
+# OS files
+.DS_Store
+Thumbs.db
