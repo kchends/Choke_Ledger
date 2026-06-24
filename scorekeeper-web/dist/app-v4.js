@@ -11,8 +11,37 @@
   function makeId(){ return 'local-'+(Date.now().toString(36)+Math.floor(Math.random()*1000).toString(36)) }
   function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }
 
-  // map skill level (1-9) to dollar-per-miss rate
-  function skillRate(skill){ const s = Number(skill) || 1; const map = {3:2,4:4,5:6,6:8,7:10,8:12,9:14}; return (s>=3 && s<=9) ? (map[s]||0) : 0; }
+  // skill rates: editable, persisted locally and saved to Firestore
+  const RATE_KEY = 'scorekeeper.rates';
+  const defaultRates = {1:0,2:0,3:2,4:4,5:6,6:8,7:10,8:12,9:14};
+  let ratesMap = null;
+  function loadRatesLocal(){ try{ const raw = localStorage.getItem(RATE_KEY); if(raw){ ratesMap = JSON.parse(raw); } else { ratesMap = Object.assign({}, defaultRates); } }catch(e){ ratesMap = Object.assign({}, defaultRates); } }
+  loadRatesLocal();
+
+  async function fetchRatesFromServer(){ try{ const url = 'https://firestore.googleapis.com/v1/projects/' + PROJECT + '/databases/' + DB_ID + '/documents/settings/skillRates?key=' + API_KEY; const res = await fetch(url); if(!res.ok){ return; } const json = await res.json(); const f = json.fields || {}; const map = {}; for(let i=1;i<=9;i++){ const key = 's'+i; if(f[key] && f[key].integerValue) map[i] = parseInt(f[key].integerValue,10); else map[i] = (defaultRates[i] || 0); } ratesMap = map; try{ localStorage.setItem(RATE_KEY, JSON.stringify(ratesMap)); }catch(e){} }catch(e){ console.error('fetchRatesFromServer error', e); } }
+
+  async function saveRatesToServer(map){ try{ const base = 'https://firestore.googleapis.com/v1/projects/' + PROJECT + '/databases/' + DB_ID + '/documents/settings?documentId=skillRates&key=' + API_KEY; const bodyFields = {}; for(const k in map){ bodyFields['s'+k] = { integerValue: String(map[k]) }; }
+      let res = await fetch(base, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ fields: bodyFields }) });
+      if(res.ok) return true; const txt = await res.text(); if(String(res.status) === '409'){ // already exists - PATCH
+        const patchUrl = 'https://firestore.googleapis.com/v1/projects/' + PROJECT + '/databases/' + DB_ID + '/documents/settings/skillRates?key=' + API_KEY;
+        const res2 = await fetch(patchUrl, { method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ fields: bodyFields }) }); if(!res2.ok){ const t2 = await res2.text(); throw new Error('patch failed '+t2); } return true; }
+      throw new Error('saveRatesToServer failed: '+res.status+' '+txt);
+    }catch(e){ console.error('saveRatesToServer error', e); return false; } }
+
+  // prompt for password and show editable rates UI
+  async function showPasswordPrompt(msg){ return new Promise(res=>{ try{ const existing = document.getElementById('password-modal'); if(existing) existing.remove(); const modal = document.createElement('div'); modal.id='password-modal'; modal.style.position='fixed'; modal.style.left='0'; modal.style.top='0'; modal.style.right='0'; modal.style.bottom='0'; modal.style.display='flex'; modal.style.alignItems='center'; modal.style.justifyContent='center'; modal.style.background='rgba(0,0,0,0.4)'; const box = document.createElement('div'); box.style.background='#fff'; box.style.padding='16px'; box.style.borderRadius='8px'; box.style.maxWidth='90%'; box.style.boxSizing='border-box'; const pmsg = document.createElement('div'); pmsg.textContent = msg; pmsg.style.marginBottom='8px'; const input = document.createElement('input'); input.type='password'; input.placeholder='Password'; input.style.marginBottom='8px'; input.style.display='block'; const ok = document.createElement('button'); ok.textContent='OK'; ok.style.marginRight='8px'; const cancel = document.createElement('button'); cancel.textContent='Cancel'; box.appendChild(pmsg); box.appendChild(input); box.appendChild(ok); box.appendChild(cancel); modal.appendChild(box); document.body.appendChild(modal); function cleanup(val){ try{ modal.remove(); }catch(e){} res(val); }
+      ok.addEventListener('click', ()=>{ const v = input.value || ''; if(String(v).trim() === '0715') cleanup(true); else cleanup(false); }); cancel.addEventListener('click', ()=> cleanup(false)); }catch(e){ console.error('showPasswordPrompt failed', e); res(false); } }); }
+
+  async function openSkillRates(){ try{ const ok = await showPasswordPrompt('Enter password to edit skill rates'); if(!ok){ setStatus('rates locked'); return; } // build modal
+    const existing = document.getElementById('rates-modal'); if(existing) existing.remove(); const modal = document.createElement('div'); modal.id='rates-modal'; modal.style.position='fixed'; modal.style.left='0'; modal.style.top='0'; modal.style.right='0'; modal.style.bottom='0'; modal.style.display='flex'; modal.style.alignItems='center'; modal.style.justifyContent='center'; modal.style.background='rgba(0,0,0,0.4)'; const box = document.createElement('div'); box.style.background='#fff'; box.style.padding='12px'; box.style.borderRadius='8px'; box.style.maxWidth='95%'; box.style.boxSizing='border-box'; const title = document.createElement('div'); title.textContent='Edit Skill Rates (per miss)'; title.style.fontWeight='700'; title.style.marginBottom='8px'; box.appendChild(title);
+    const table = document.createElement('div'); table.style.display='grid'; table.style.gridTemplateColumns='1fr 1fr'; table.style.gap='8px'; for(let i=1;i<=9;i++){ const lbl = document.createElement('div'); lbl.textContent = 'Skill ' + i; const inp = document.createElement('input'); inp.type='number'; inp.min='0'; inp.value = (ratesMap && ratesMap[i]!==undefined) ? ratesMap[i] : (defaultRates[i]||0); inp.dataset.skill = String(i); table.appendChild(lbl); table.appendChild(inp); }
+    box.appendChild(table);
+    const save = document.createElement('button'); save.textContent='Save'; save.style.marginTop='8px'; const cancel = document.createElement('button'); cancel.textContent='Cancel'; cancel.style.marginLeft='8px'; box.appendChild(save); box.appendChild(cancel); modal.appendChild(box); document.body.appendChild(modal);
+    save.addEventListener('click', async ()=>{ try{ const inputs = modal.querySelectorAll('input'); const newMap = {}; inputs.forEach(inp=>{ const k = Number(inp.dataset.skill || 0); newMap[k] = Number(inp.value) || 0; }); ratesMap = newMap; try{ localStorage.setItem(RATE_KEY, JSON.stringify(ratesMap)); }catch(e){} setStatus('saving rates...'); await saveRatesToServer(ratesMap); setStatus('rates saved'); render(players); updateTotalAndChart(); modal.remove(); }catch(e){ console.error('save rates failed', e); setStatus('rates save failed'); } });
+    cancel.addEventListener('click', ()=>{ try{ modal.remove(); }catch(e){} setStatus('rates cancelled'); });
+  }catch(e){ console.error('openSkillRates failed', e); setStatus('rates failed'); } }
+
+  function skillRate(skill){ const s = Number(skill) || 1; if(!ratesMap) loadRatesLocal(); return ratesMap && ratesMap[s] !== undefined ? Number(ratesMap[s]) : (defaultRates[s] || 0); }
 
   let editingId = null;
   const expandedPlayers = new Set();
@@ -165,6 +194,11 @@
       }) }
 
   let players = loadLocal(); render(players); setStatus('ready (local)');
+  // add Skill Rates button to top center
+  try{
+    const top = document.getElementById('topCenter');
+    if(top){ const srBtn = document.createElement('button'); srBtn.id='skillRatesBtn'; srBtn.textContent='Skill Rates'; srBtn.style.marginTop='6px'; srBtn.style.marginLeft='8px'; srBtn.addEventListener('click', openSkillRates); top.appendChild(srBtn); }
+  }catch(e){ console.error('adding Skill Rates button failed', e); }
 
   document.getElementById('addBtn').addEventListener('click', ()=>{ const input=document.getElementById('nameInput'); const name=input.value.trim(); if(!name) return; input.value=''; addPlayer(name); });
   const resetBtnEl = document.getElementById('resetBtn'); if(resetBtnEl){ resetBtnEl.addEventListener('click', resetAll); /* removed from UI */ }
@@ -230,21 +264,10 @@
   function updateTotalAndChart(){ const totalMisses = players.reduce((s,p)=> s + (p.misses||0), 0); const totalAmount = players.reduce((s,p)=> s + ((p.misses||0) * (p.skill||1)), 0); const totalMissesEl = document.getElementById('totalMisses'); const totalAmountEl = document.getElementById('totalAmount'); if(totalMissesEl) totalMissesEl.textContent = 'Total missed shots: ' + totalMisses; if(totalAmountEl) totalAmountEl.textContent = 'Total amount: $' + totalAmount; // charts
       try{
         const barLabelPlugin = { id: 'barValue', afterDatasetsDraw: function(chart){ const ctx = chart.ctx; const canvasWidth = chart.width; const isAmountChart = chart && chart.canvas && chart.canvas.id === 'chartAmount'; chart.data.datasets.forEach(function(dataset, i){ const meta = chart.getDatasetMeta(i); meta.data.forEach(function(bar, idx){ const val = dataset.data[idx]; if(val===undefined || val===null) return; const x = bar.x; const y = bar.y; ctx.save(); ctx.font = 'bold 12px Arial'; const displayVal = isAmountChart ? ('$' + String(val)) : String(val);
-            // determine best text color based on bar background lightness
-            let textColor = '#111';
-            try{
-              const bg = (dataset.backgroundColor && dataset.backgroundColor[idx]) ? dataset.backgroundColor[idx] : null;
-              if(bg && typeof bg === 'string'){
-                // support hsl(h,s%,l%)
-                const hslMatch = bg.match(/hsl\((\d+),\s*(\d+)%?,\s*(\d+)%?\)/);
-                if(hslMatch){ const l = parseInt(hslMatch[3],10); textColor = (l>60) ? '#111' : '#fff'; }
-                // support rgb(...) or rgba(...)
-                else if(bg.indexOf('rgb')===0){ const nums = bg.replace(/rgba?\(/,'').replace(')','').split(',').map(n=>parseInt(n,10)); if(nums.length>=3){ const r=nums[0], g=nums[1], b=nums[2]; const luminance = (0.299*r + 0.587*g + 0.114*b); textColor = (luminance>200) ? '#111' : '#fff'; }}
-                // support hex fallback
-                else if(bg.indexOf('#')===0){ const hex = bg.replace('#',''); const bigint = parseInt(hex.length===3? hex.split('').map(c=>c+c).join(''): hex,16); const r=(bigint>>16)&255, g=(bigint>>8)&255, b=bigint&255; const luminance=(0.299*r + 0.587*g + 0.114*b); textColor = (luminance>200) ? '#111' : '#fff'; }
-              }
-            }catch(e){ textColor='#111'; }
-            const textWidth = ctx.measureText(displayVal).width; if(x + 20 + textWidth < canvasWidth){ ctx.fillStyle = textColor; ctx.textAlign = 'left'; ctx.fillText(displayVal, x + 10, y); } else { ctx.fillStyle = (textColor==='#111') ? '#fff' : textColor; ctx.textAlign = 'right'; ctx.fillText(displayVal, x - 8, y); }
+            // force label font color to black for legibility
+            let textColor = '#000';
+            const textWidth = ctx.measureText(displayVal).width;
+            if(x + 20 + textWidth < canvasWidth){ ctx.fillStyle = '#000'; ctx.textAlign = 'left'; ctx.fillText(displayVal, x + 10, y); } else { ctx.fillStyle = '#000'; ctx.textAlign = 'right'; ctx.fillText(displayVal, x - 8, y); }
             ctx.restore(); }); }); } };
 
         // unified soft palette: determine base order from list ordering so colors match across charts
