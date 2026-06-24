@@ -66,7 +66,7 @@
       if(bo && now < bo){ console.warn('events backoff active for', playerId); const p = players.find(x=>x.id===playerId); return p && p._events ? p._events : []; }
       // return cached events for short TTL to avoid quota overuse
       const cached = _eventsCache.get(playerId);
-      if(cached && (now - cached.ts) < 30000){ return cached.events; }
+      if(cached && (now - cached.ts) < 300000){ return cached.events; }
 
       const [misses, changes] = await Promise.all([ listMissEvents(playerId), listChangeEntries(playerId) ]);
       const mappedChanges = (changes||[]).map(c=>{ let rate = undefined; let amount = undefined; try{ if(c.patch){ const p = JSON.parse(c.patch); if(p.rate!==undefined) rate = Number(p.rate); if(p.amount!==undefined) amount = Number(p.amount); } if(amount===undefined && c.snapshot){ const s = JSON.parse(c.snapshot); if(s.amount!==undefined) amount = Number(s.amount); if(s.rate!==undefined) rate = Number(s.rate); } }catch(e){} return { ts: c.ts||0, tsIso: c.tsIso||'', action: c.action, rate, amount, patch: c.patch, snapshot: c.snapshot }; });
@@ -118,11 +118,15 @@
         if(p.id === editingId){
           const nameInput = document.createElement('input'); nameInput.type = 'text'; nameInput.value = p.name || '';
           nameInput.style.padding = '8px'; nameInput.style.borderRadius = '6px'; nameInput.style.marginRight = '8px';
+          const skillLabel = document.createElement('label'); skillLabel.textContent = 'SL'; skillLabel.style.marginRight = '6px'; skillLabel.style.fontSize='12px';
           const skillInput = document.createElement('input'); skillInput.type = 'number'; skillInput.min = '1'; skillInput.max = '9'; skillInput.value = p.skill || 1;
-          skillInput.style.width = '80px'; skillInput.style.marginRight = '8px';
-          const saveBtn = document.createElement('button'); saveBtn.textContent = 'Save'; saveBtn.onclick = ()=> saveEdit(p.id, nameInput.value, skillInput.value);
+          skillInput.style.width = '80px'; skillInput.style.marginRight = '12px';
+          const missesLabel = document.createElement('label'); missesLabel.textContent = 'Misses'; missesLabel.style.marginRight = '6px'; missesLabel.style.fontSize='12px';
+          const missesInput = document.createElement('input'); missesInput.type = 'number'; missesInput.min = '0'; missesInput.value = p.misses || 0;
+          missesInput.style.width = '80px'; missesInput.style.marginRight = '8px';
+          const saveBtn = document.createElement('button'); saveBtn.textContent = 'Save'; saveBtn.onclick = ()=> saveEdit(p.id, nameInput.value, skillInput.value, missesInput.value);
           const cancelBtn = document.createElement('button'); cancelBtn.textContent = 'Cancel'; cancelBtn.onclick = ()=> { editingId = null; render(players); };
-          infoDiv.appendChild(nameInput); infoDiv.appendChild(skillInput); infoDiv.appendChild(saveBtn); infoDiv.appendChild(cancelBtn);
+          infoDiv.appendChild(nameInput); infoDiv.appendChild(skillLabel); infoDiv.appendChild(skillInput); infoDiv.appendChild(missesLabel); infoDiv.appendChild(missesInput); infoDiv.appendChild(saveBtn); infoDiv.appendChild(cancelBtn);
         } else {
           const nameDiv = document.createElement('div'); nameDiv.className='name'; nameDiv.style.cursor='pointer'; nameDiv.innerHTML = safeName + badge;
           const subDiv = document.createElement('div'); subDiv.className='sub'; subDiv.textContent = 'Skill: ' + (p.skill||1) + ' — ' + (p.misses||0) + ' misses — $' + amount;
@@ -211,10 +215,30 @@
 
   function editPlayer(id){ editingId = id; render(players); }
 
-    async function saveEdit(id,newName,newSkill){ const p = players.find(x=> x.id===id); if(!p) return; const old = { name: p.name, skill: p.skill };
-      p.name = (newName||'').trim(); p.skill = Math.max(1, Math.min(9, Number(newSkill) || 1)); editingId = null; saveLocal(players); render(players); updateTotalAndChart(); if(String(p.id).startsWith('local-')){ setStatus('saved (local)'); return true; }
-      try{ setStatus('saving...'); const ok = await updateServerPlayer(p.id,{ name: p.name, skill: p.skill }); if(ok){ setStatus('saved'); return true; } else { throw new Error('server returned failure'); } }catch(e){ console.error('edit failed', e); // revert
-        p.name = old.name; p.skill = old.skill; saveLocal(players); render(players); updateTotalAndChart(); setStatus('save failed'); return false; } }
+    async function saveEdit(id,newName,newSkill,newMisses){ const p = players.find(x=> x.id===id); if(!p) return; const old = { name: p.name, skill: p.skill, misses: p.misses, amountOwed: p.amountOwed };
+      // apply edits locally
+      p.name = (newName||'').trim(); p.skill = Math.max(1, Math.min(9, Number(newSkill) || 1));
+      const newMiss = Math.max(0, Number(newMisses) || 0);
+      const oldMiss = Number(p.misses||0);
+      if(newMiss !== oldMiss){ // update misses and adjust events
+        const delta = oldMiss - newMiss; // positive if removing misses
+        p.misses = newMiss;
+        p.amountOwed = (p.misses||0) * skillRate(p.skill);
+        if(delta > 0){ // remove latest 'delta' miss events from history (local and attempt server delete)
+          if(!p._events) p._events = [];
+          let removed = 0;
+          // iterate over a copy sorted by ts desc
+          const eventsCopy = (p._events||[]).slice();
+          for(const e of eventsCopy){ if(removed >= delta) break; if(e && e.action === 'miss'){ const idx = p._events.indexOf(e); if(idx !== -1) p._events.splice(idx,1); removed++;
+                // attempt server delete if event has id and this player is server-backed
+                if(e.id && !String(id).startsWith('local-')){ try{ await deleteMissEvent(id, e.id); }catch(ex){ console.error('deleteMissEvent failed', ex); } }
+             } }
+          try{ await createChangeEntry(id, 'remove_miss', JSON.stringify({ removed: removed }), JSON.stringify(old)); }catch(e){ console.error('createChangeEntry remove_miss failed', e); }
+        }
+      }
+      editingId = null; saveLocal(players); render(players); updateTotalAndChart(); if(String(p.id).startsWith('local-')){ setStatus('saved (local)'); return true; }
+      try{ setStatus('saving...'); const ok = await updateServerPlayer(p.id,{ name: p.name, skill: p.skill, misses: p.misses, amountOwed: p.amountOwed }); if(ok){ setStatus('saved'); return true; } else { throw new Error('server returned failure'); } }catch(e){ console.error('edit failed', e); // revert
+        p.name = old.name; p.skill = old.skill; p.misses = old.misses; p.amountOwed = old.amountOwed; saveLocal(players); render(players); updateTotalAndChart(); setStatus('save failed'); return false; } }
 
   async function incPlayer(id){ try{
       const player = players.find(p=>p.id===id);
@@ -256,6 +280,8 @@
     const url = base + '?key=' + API_KEY + mask.map(m=>'&updateMask.fieldPaths='+encodeURIComponent(m)).join(''); const res=await fetch(url,{ method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ fields: bodyFields }) }); if(!res.ok){ const txt=await res.text(); throw new Error('update failed: '+res.status+' '+txt); } return true; }catch(e){ console.error('updateServerPlayer error', e); return false; } }
 
   async function createMissEvent(id, skill, rate){ try{ const url = 'https://firestore.googleapis.com/v1/projects/' + PROJECT + '/databases/' + DB_ID + '/documents/players/' + encodeURIComponent(id) + '/misses?key=' + API_KEY; const now = Date.now(); const body = { fields: { ts: { integerValue: String(now) }, tsIso: { stringValue: new Date(now).toISOString() }, skill: { integerValue: String(skill) }, rate: { integerValue: String(rate) }, amount: { integerValue: String(rate) } } }; const res = await fetch(url, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) }); if(!res.ok){ const txt = await res.text(); throw new Error('createMissEvent failed: '+res.status+' '+txt); } return true; }catch(e){ console.error('createMissEvent error', e); return false; } }
+
+  async function deleteMissEvent(playerId, missEventId){ try{ if(!playerId || !missEventId) return false; const url = 'https://firestore.googleapis.com/v1/projects/' + PROJECT + '/databases/' + DB_ID + '/documents/players/' + encodeURIComponent(playerId) + '/misses/' + encodeURIComponent(missEventId) + '?key=' + API_KEY; const res = await fetch(url, { method: 'DELETE' }); if(!res.ok){ const txt = await res.text(); throw new Error('deleteMissEvent failed: '+res.status+' '+txt); } return true; }catch(e){ console.error('deleteMissEvent error', e); return false; } }
 
   async function createChangeEntry(id, action, patchStr, snapshotStr){ try{ const url = 'https://firestore.googleapis.com/v1/projects/' + PROJECT + '/databases/' + DB_ID + '/documents/players/' + encodeURIComponent(id) + '/changes?key=' + API_KEY; const now = Date.now(); const bodyFields = { action: { stringValue: String(action) }, ts: { integerValue: String(now) }, tsIso: { stringValue: new Date(now).toISOString() } }; if(patchStr) bodyFields.patch = { stringValue: String(patchStr) }; if(snapshotStr) bodyFields.snapshot = { stringValue: String(snapshotStr) }; const res = await fetch(url, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ fields: bodyFields }) }); if(!res.ok){ const txt = await res.text(); throw new Error('createChangeEntry failed: '+res.status+' '+txt); } return true; }catch(e){ console.error('createChangeEntry error', e); return false; } }
   async function deleteServerPlayer(id){ try{ const url='https://firestore.googleapis.com/v1/projects/'+PROJECT+'/databases/'+DB_ID+'/documents/players/'+id+'?key='+API_KEY; const res=await fetch(url,{ method:'DELETE' }); if(!res.ok){ const txt=await res.text(); throw new Error('delete failed: '+res.status+' '+txt); } return true; }catch(e){ console.error('deleteServerPlayer error', e); return false; } }
@@ -314,17 +340,38 @@
       players = players.concat(localOnly.filter(p=> !players.find(x=>x.id===p.id)));
       saveLocal(players); render(players); updateTotalAndChart();
       for(const p of localOnly){ const newId = await createServerPlayer(p); if(newId){ players = players.map(x=> x.id===p.id? {...x, id:newId}: x); saveLocal(players); render(players); updateTotalAndChart(); } }
-      if(typeof window !== 'undefined'){ setInterval(async ()=>{ // avoid clobbering inline edits while user is editing
-                  if(typeof editingId !== 'undefined' && editingId !== null) { /* skip server merge while editing to preserve input state */ return; }
-                  const s = await listServerPlayers(); if(s && Array.isArray(s)){ const localOnly2 = players.filter(p=> String(p.id).startsWith('local-'));
-                  // merge same as above
-                  const byId2 = {};
-                  for(const l of players){ byId2[l.id]=Object.assign({},l); }
-                  for(const ss of s){ const existing = byId2[ss.id]; if(existing){ const mergedObj = { id: ss.id, name: (ss.name && String(ss.name).trim()) ? ss.name : (existing.name || ss.name), skill: (ss.skill!==undefined) ? ss.skill : (existing.skill||1), misses: (ss.misses!==undefined)? ss.misses : (existing.misses||0), createdAt: ss.createdAt||existing.createdAt }; if(existing._events) mergedObj._events = existing._events; byId2[ss.id] = mergedObj; } else { byId2[ss.id] = Object.assign({}, ss); } }
-                  let merged = Object.values(byId2);
-                  merged = merged.concat(localOnly2.filter(p=> !merged.find(x=>x.id===p.id)));
-                  players = merged;
-                  saveLocal(players); render(players); updateTotalAndChart(); setStatus('connected to Firestore (REST)'); } }, 2000); }
+      if(typeof window !== 'undefined'){
+                        const POLL_INTERVAL = 60000;
+                        let backoffMultiplier = 1;
+                        const MAX_BACKOFF_MULT = 16;
+                        let backoffUntil = 0;
+                        async function pollServerOnce(){
+                          try{
+                            if(typeof editingId !== 'undefined' && editingId !== null) return; // skip while editing
+                            if(typeof document !== 'undefined' && document.hidden) return; // skip when tab hidden
+                            if(backoffUntil && Date.now() < backoffUntil) return; // backoff active
+                            const s = await listServerPlayers();
+                            if(s && Array.isArray(s)){
+                              backoffMultiplier = 1; backoffUntil = 0;
+                              const localOnly2 = players.filter(p=> String(p.id).startsWith('local-'));
+                              const byId2 = {};
+                              for(const l of players){ byId2[l.id]=Object.assign({},l); }
+                              for(const ss of s){ const existing = byId2[ss.id]; if(existing){ const mergedObj = { id: ss.id, name: (ss.name && String(ss.name).trim()) ? ss.name : (existing.name || ss.name), skill: (ss.skill!==undefined) ? ss.skill : (existing.skill||1), misses: (ss.misses!==undefined)? ss.misses : (existing.misses||0), createdAt: ss.createdAt||existing.createdAt }; if(existing._events) mergedObj._events = existing._events; byId2[ss.id] = mergedObj; } else { byId2[ss.id] = Object.assign({}, ss); } }
+                              let merged = Object.values(byId2);
+                              merged = merged.concat(localOnly2.filter(p=> !merged.find(x=>x.id===p.id)));
+                              players = merged;
+                              saveLocal(players); render(players); updateTotalAndChart(); setStatus('connected to Firestore (REST)');
+                            }
+                          }catch(e){
+                            console.error('pollServerOnce failed', e);
+                            backoffMultiplier = Math.min(MAX_BACKOFF_MULT, Math.max(2, backoffMultiplier * 2));
+                            backoffUntil = Date.now() + (POLL_INTERVAL * backoffMultiplier);
+                          }
+                        }
+                        // schedule periodic poll and run on visibility change when coming back
+                        setInterval(pollServerOnce, POLL_INTERVAL);
+                        try{ document.addEventListener && document.addEventListener('visibilitychange', ()=>{ if(typeof document !== 'undefined' && !document.hidden) { pollServerOnce().catch(()=>{}); } }, { passive:true }); }catch(e){}
+                      }
     }
   })();
 

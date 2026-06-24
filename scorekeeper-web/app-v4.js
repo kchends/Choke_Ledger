@@ -69,15 +69,37 @@
       players = players.concat(localOnly.filter(p=> !players.find(x=>x.id===p.id)));
       saveLocal(players); render(players); updateTotalAndChart();
       for(const p of localOnly){ const newId = await createServerPlayer(p); if(newId){ players = players.map(x=> x.id===p.id? {...x, id:newId}: x); saveLocal(players); render(players); updateTotalAndChart(); } }
-      if(typeof window !== 'undefined'){ setInterval(async ()=>{ const s = await listServerPlayers(); if(s && Array.isArray(s)){ const localOnly2 = players.filter(p=> String(p.id).startsWith('local-'));
-            // merge same as above
-            const byId2 = {};
-            for(const l of players){ byId2[l.id]=Object.assign({},l); }
-            for(const ss of s){ const existing = byId2[ss.id]; if(existing){ byId2[ss.id] = { id: ss.id, name: (ss.name && String(ss.name).trim()) ? ss.name : (existing.name || ss.name), misses: (ss.misses!==undefined)? ss.misses : (existing.misses||0), createdAt: ss.createdAt||existing.createdAt }; } else { byId2[ss.id] = Object.assign({}, ss); } }
-            let merged = Object.values(byId2);
-            merged = merged.concat(localOnly2.filter(p=> !merged.find(x=>x.id===p.id)));
-            players = merged;
-            saveLocal(players); render(players); updateTotalAndChart(); setStatus('connected to Firestore (REST)'); } }, 2000); }
+      if(typeof window !== 'undefined'){
+            const POLL_INTERVAL = 60000;
+            let backoffMultiplier = 1;
+            const MAX_BACKOFF_MULT = 16;
+            let backoffUntil = 0;
+            async function pollServerOnce(){
+              try{
+                if(typeof editingId !== 'undefined' && editingId !== null) return; // skip while editing
+                if(typeof document !== 'undefined' && document.hidden) return; // skip when tab hidden
+                if(backoffUntil && Date.now() < backoffUntil) return; // backoff active
+                const s = await listServerPlayers();
+                if(s && Array.isArray(s)){
+                  backoffMultiplier = 1; backoffUntil = 0;
+                  const localOnly2 = players.filter(p=> String(p.id).startsWith('local-'));
+                  const byId2 = {};
+                  for(const l of players){ byId2[l.id]=Object.assign({},l); }
+                  for(const ss of s){ const existing = byId2[ss.id]; if(existing){ byId2[ss.id] = { id: ss.id, name: (ss.name && String(ss.name).trim()) ? ss.name : (existing.name || ss.name), misses: (ss.misses!==undefined)? ss.misses : (existing.misses||0), createdAt: ss.createdAt||existing.createdAt }; if(existing._events) byId2[ss.id]._events = existing._events; } else { byId2[ss.id] = Object.assign({}, ss); } }
+                  let merged = Object.values(byId2);
+                  merged = merged.concat(localOnly2.filter(p=> !merged.find(x=>x.id===p.id)));
+                  players = merged;
+                  saveLocal(players); render(players); updateTotalAndChart(); setStatus('connected to Firestore (REST)');
+                }
+              }catch(e){
+                console.error('pollServerOnce failed', e);
+                backoffMultiplier = Math.min(MAX_BACKOFF_MULT, Math.max(2, backoffMultiplier * 2));
+                backoffUntil = Date.now() + (POLL_INTERVAL * backoffMultiplier);
+              }
+            }
+            setInterval(pollServerOnce, POLL_INTERVAL);
+            try{ document.addEventListener && document.addEventListener('visibilitychange', ()=>{ if(typeof document !== 'undefined' && !document.hidden) { pollServerOnce().catch(()=>{}); } }, { passive:true }); }catch(e){}
+          }
     }
   })();
 
